@@ -36,14 +36,39 @@ import sys
 import csv
 import math
 
-if len(sys.argv) < 2:
+def help():
     print "pangloss determines the programming language a file is written in."
-    print "Usage: pangloss filename"
+    print "Usage: pangloss { filename [--ext=XYZ] }"
+    print("       The --ext argument can override the physical extension of the file")
+    print("Alternatively, pangloss can run in a batch mode, where --batch=XYZ argument")
+    print("contains list of files, possibly followed by their extension hints")
     sys.exit(1)
 
-fname = sys.argv[1]
-ext   = os.path.splitext(fname)[1]
-
+input = []
+if (len(sys.argv) < 2):
+    help();
+if (sys.argv[1].startswith("--batch=")):
+    # batch mode
+    if (len(sys.argv) > 2):
+        help()
+    with open(sys.argv[1][8:]) as f:
+        for line in f:
+            x = line.split(",")
+            if (len(x) == 1):
+                len.append(os.path.splitext(x[0])[1])
+            input.append((x[0], x[1]))
+else:
+    i = 1
+    while (i < len(sys.argv)):
+        fname = sys.argv[i]
+        i += 1
+        if (i < len(sys.argv) and sys.argv[i].startswith("--ext=")):
+            ext = sys.argv[i][6:]
+            i += 1
+        else:
+            ext = os.path.splitext(fname)[1]
+        input.append((fname, ext))    
+            
 def words(fileobj):
     for line in fileobj:
         for word in line.split():
@@ -87,39 +112,46 @@ for i in range(0, len(classifiers)):
     for j in classifiers[i].keys():
         classifiers[i][j] = float(classifiers[i][j]) / total
 
-# Load up input file to be classified.
 
-counts = {}
-total = 0
+for x in input:
+    fname = x[0]
+    ext = x[1]
 
-with open(fname, 'r') as f:
-    # Generate histogram of counts for each word.
-    wordgen = words(f)
-    for word in wordgen:
-        counts[word] = counts.get(word, 0) + 1
-        total += 1
+    counts = {}
+    total = 0
 
-argmax = 0
-max = float('-inf')
+    # Load up input file to be classified.
 
-for i in xrange(0,len(classifiers)):
+    with open(fname, 'r') as f:
+        # Generate histogram of counts for each word.
+        wordgen = words(f)
+        for word in wordgen:
+            counts[word] = counts.get(word, 0) + 1
+            total += 1
 
-    # Naive Bayes.
-    val = 1
-    for word in counts:
-        c       = classifiers[i].get(word, 0.0001)
-        val     += math.log(counts[word] * c)
+    argmax = 0
+    max = float('-inf')
+    secondMax = float('-inf')
 
-    # Incorporate a modest prior for the extension
-    for thisext in extensions[i]:
-        if ext == thisext:
-            val /= extensionPrior
-            break
+    for i in xrange(0,len(classifiers)):
 
-    # New maximum?
-    if val > max:
-        max = val
-        argmax = i
+        # Naive Bayes.
+        val = 1
+        for word in counts:
+            c       = classifiers[i].get(word, 0.0001)
+            val     += math.log(counts[word] * c)
 
-print classes[argmax],
+        # Incorporate a modest prior for the extension
+        for thisext in extensions[i]:
+            if ext == thisext:
+                val /= extensionPrior
+                break
+
+        # New maximum?
+        if val > max:
+            secondMax = max
+            max = val
+            argmax = i
+
+    print(fname + "," + classes[argmax] +  "," + str(1 - (max / secondMax)))
 
